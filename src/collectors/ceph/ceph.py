@@ -196,9 +196,15 @@ class CephCollector(diamond.collector.Collector):
         """Parse a socket name like /var/run/ceph/foo-osd.2.asok
 
         Return a 3 tuple of cluster name, service type, service id
+        or None if we don't parse it correctly
         """
-        return re.match("^(.*)-(.*)\.(.*).{0}$".format(self.config['socket_ext']),
-                        os.path.basename(path)).groups()
+        try:
+            cluster_name, service_type, service_id = re.match("^(.*)-(.*)\.(.*).{0}$".format(self.config['socket_ext']),
+                                                              os.path.basename(path)).groups()
+        except AttributeError:
+            return None
+
+        return (cluster_name, service_type, service_id)
 
     def _publish_longrunavg(self, counter_prefix, stats, path, stat_type, name_class):
         """Publish a long-running average metric.
@@ -388,7 +394,12 @@ class CephCollector(diamond.collector.Collector):
         If this service is a mon and it is the leader of a quorum, then
         publish statistics about the cluster.
         """
-        cluster_name, service_type, service_id = self._parse_socket_name(path)
+        service_data = self._parse_socket_name(path)
+        if service_data is None:
+            return
+
+        cluster_name, service_type, service_id = service_data
+
         if service_type != 'mon':
             return
 
@@ -437,7 +448,11 @@ class CephCollector(diamond.collector.Collector):
         if not self.config['perf_counters_enabled']:
             return
 
-        cluster_name, service_type, service_id = self._parse_socket_name(path)
+        service_data = self._parse_socket_name(path)
+        if service_data is None:
+            return
+
+        cluster_name, service_type, service_id = service_data
 
         if service_type == 'osd' and not self.config['osd_stats_enabled']:
             return
