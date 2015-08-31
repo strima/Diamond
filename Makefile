@@ -3,6 +3,11 @@ PROJECT=diamond
 VERSION :=$(shell bash version.sh )
 RELEASE :=$(shell ls -1 dist/*.noarch.rpm 2>/dev/null | wc -l )
 HASH	:=$(shell git rev-parse HEAD )
+PACKAGE_VERSION ?= 1
+CODENAME ?= $(shell lsb_release -sc)
+$(shell echo $(PACKAGE_VERSION)$(CODENAME) > localversion)
+# You must set BPTAG when DCH_VERSION does not match a git tag
+BPTAG ?= "" # ~bpoNN+M where NN is the Debian major version and M is the 'package revision'
 
 all:
 	@echo "make run      - Run Diamond from this directory"
@@ -61,12 +66,16 @@ buildrpm: sdist
 deb: builddeb
 
 builddeb: version 
-	dch --newversion $(VERSION) --distribution unstable --force-distribution -b "Last Commit: $(shell git log -1 --pretty=format:'(%ai) %H %cn <%ce>')"
+	if [ "$(shell lsb_release -si)" = "Ubuntu" ] ; then \
+		dch --newversion $(VERSION)-$(PACKAGE_VERSION)$(CODENAME) --distribution unstable --force-distribution -b "Last Commit: $(shell git log -1 --pretty=format:'(%ai) %H %cn <%ce>')"; \
+	else \
+		dch --newversion $(VERSION)$(BPTAG) --distribution unstable --force-distribution -b "Last Commit: $(shell git log -1 --pretty=format:'(%ai) %H %cn <%ce>')"; \
+	fi
 	dch --release  "new upstream"
 	./setup.py sdist --prune
 	mkdir -p build
 	tar -C build -zxf dist/$(PROJECT)-$(VERSION).tar.gz
-	(cd build/$(PROJECT)-$(VERSION) && debuild -us -uc -v$(VERSION))
+	(cd build/$(PROJECT)-$(VERSION) && debuild --no-tgz-check -us -uc -v$(VERSION))
 	@echo "Package is at build/$(PROJECT)_$(VERSION)_all.deb"
 
 ebuild: buildebuild
