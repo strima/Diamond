@@ -47,10 +47,13 @@ def flatten_dictionary(input_dict, path=None):
 
       [([a,b], 10), ([c], 20)]
     """
+    donotInclude = ['nick','description']
     if path is None:
         path = []
 
     for name, value in sorted(input_dict.items()):
+        if name in donotInclude:
+            continue
         path.append(name)
         if isinstance(value, dict):
             for result in flatten_dictionary(value, path):
